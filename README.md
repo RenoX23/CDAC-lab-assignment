@@ -1,1 +1,265 @@
 # CDAC-lab-assignment
+
+
+# Terraform AWS Infrastructure Lab – DevOps Assignment
+
+## 📌 Overview
+This project demonstrates **Infrastructure as Code (IaC)** using **Terraform** to provision AWS resources in an automated, secure, and reproducible manner.
+
+The infrastructure is deployed from **Ubuntu running on Oracle VirtualBox**, using **AWS CLI + Terraform**, without any manual resource creation.
+
+This lab follows **DevOps best practices**, including:
+- Automation
+- Least privilege IAM access
+- Version-controlled infrastructure
+- Reproducibility across environments
+
+---
+
+## 🧱 Infrastructure Components Created
+
+Using Terraform, the following AWS resources are provisioned:
+
+1. **EC2 Instance**
+   - Amazon Linux 2 AMI
+   - Instance type: `t3.micro`
+2. **S3 Bucket**
+   - Used for storing application data
+   - Globally unique bucket name
+3. **IAM User**
+   - Created for a DevOps engineer
+4. **IAM Policy**
+   - Least-privilege policy allowing:
+     - Start EC2 instances
+     - Stop EC2 instances
+     - Describe EC2 instances
+5. **IAM Policy Attachment**
+   - Policy attached to the DevOps IAM user
+
+---
+
+## 🖥️ Environment Setup
+
+- Host OS: Windows
+- Virtualization: Oracle VirtualBox
+- Guest OS: Ubuntu
+- Cloud Provider: AWS
+- Tools Used:
+  - AWS CLI v2
+  - Terraform
+
+---
+
+## 📂 Project Structure
+
+```text
+devops-terraform-lab/
+├── provider.tf
+├── variables.tf
+├── main.tf
+└── outputs.tf
+
+```
+### ⚙️ Step-by-Step Implementation
+
+#### 1️⃣ Install Required Packages (Ubuntu)
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl unzip git
+
+```
+2️⃣ Install AWS CLI
+
+```bash
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+```
+
+Verify installation:
+```bash
+aws --version
+```
+
+3️⃣ Configure AWS CLI (IAM User – NOT Root)
+```bash
+aws configure
+```
+
+Provide:
+
+Access Key ID
+
+Secret Access Key
+
+Default region (e.g., ap-south-1)
+
+Output format: json
+
+Verify identity:
+```bash
+aws sts get-caller-identity
+```
+4️⃣ Install Terraform
+```bash
+curl -fsSL https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip -o terraform.zip
+unzip terraform.zip
+sudo mv terraform /usr/local/bin/
+```
+
+Verify:
+```bash
+terraform version
+```
+🧾 Terraform Configuration Files:
+
+🔹 provider.tf
+```hcl
+provider "aws" {
+  region = var.aws_region
+}
+```
+🔹 variables.tf
+```hcl
+variable "aws_region" {
+  description = "AWS region"
+  default     = "ap-south-1"
+}
+variable "instance_type" {
+  description = "EC2 instance type"
+  default     = "t3.micro"
+}
+```
+🔹 main.tf
+```hcl
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+}
+
+resource "aws_instance" "devops_ec2" {
+  ami           = data.aws_ami.amazon_linux.id
+  instance_type = var.instance_type
+
+  tags = {
+    Name = "DevOps-Lab-EC2"
+  }
+}
+
+resource "random_id" "bucket_id" {
+  byte_length = 4
+}
+
+resource "aws_s3_bucket" "app_bucket" {
+  bucket = "devops-lab-bucket-${random_id.bucket_id.hex}"
+}
+
+resource "aws_iam_user" "devops_user" {
+  name = "devops-engineer-user"
+}
+
+resource "aws_iam_policy" "ec2_control_policy" {
+  name        = "DevOpsEC2ControlPolicy"
+  description = "Allows start, stop, and describe EC2 instances"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = [
+          "ec2:StartInstances",
+          "ec2:StopInstances",
+          "ec2:DescribeInstances"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_user_policy_attachment" "attach_policy" {
+  user       = aws_iam_user.devops_user.name
+  policy_arn = aws_iam_policy.ec2_control_policy.arn
+}
+```
+🔹 outputs.tf
+```hcl
+output "ec2_instance_id" {
+  description = "EC2 Instance ID"
+  value       = aws_instance.devops_ec2.id
+}
+
+output "s3_bucket_name" {
+  description = "S3 Bucket Name"
+  value       = aws_s3_bucket.app_bucket.bucket
+}
+
+output "iam_user_name" {
+  description = "IAM User Name"
+  value       = aws_iam_user.devops_user.name
+}
+```
+### 🚀 Terraform Execution Commands
+
+Run the following commands in order:
+```bash
+terraform init
+terraform validate
+terraform plan
+terraform apply
+```
+
+Type yes when prompted.
+
+### 📤 Expected Outputs:
+
+After successful execution, Terraform displays:
+
+EC2 Instance ID
+
+S3 Bucket Name
+
+IAM User Name
+
+These confirm successful resource creation.
+
+### 🔐 Security Best Practices Followed:
+
+AWS root account is never used
+
+IAM user with least privilege is created
+
+Custom IAM policy with restricted EC2 permissions
+
+No hardcoded credentials
+
+All infrastructure defined as code
+
+### 🧠 Key Learnings:
+
+Infrastructure as Code using Terraform
+
+AWS IAM user and policy management
+
+EC2 and S3 provisioning
+
+Terraform variables and outputs
+
+Secure DevOps workflows
+
+🧹 Cleanup (Optional)
+
+To remove all created resources:
+```bash
+terraform destroy
+```
+✅ Conclusion
+
+This lab successfully demonstrates how Terraform can be used to automate AWS infrastructure provisioning while following DevOps and security best practices. The solution is minimal, compliant with requirements, and fully explainable.
